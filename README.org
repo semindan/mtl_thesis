@@ -1,1 +1,11 @@
+* Important
+This project uses code from the following repos:
+
+[[https://github.com/facebookresearch/fairseq/blob/25c20e6a5e781e4ef05e23642f21c091ba64872e/examples/rxf/README.md?plain=1#L5][implementation of R3F from fairseq]]
+
+[[https://github.com/tuvuumass/task-transferability][task-transferability]]
+
+[[https://github.com/huggingface/transformers/blob/main/examples/flax/language-modeling/run_t5_mlm_flax.py][mlm task pre-processing from Hugging Face]]
+
+[[https://github.com/WeiChengTseng/Pytorch-PCGrad][implementation of PCGrad]]
 
