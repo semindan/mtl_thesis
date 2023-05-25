@@ -37,6 +37,7 @@ def init_callbacks(args):
     )
     return [lr_monitor, checkpoint_callback, early_stop_callback]
 
+
 def init_logger(args):
     wandb_logger = pl_loggers.WandbLogger(
         name=args.name,
@@ -45,15 +46,18 @@ def init_logger(args):
     )
     return wandb_logger
 
+
 def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     if args.devices > 0:
         torch.cuda.manual_seed_all(args.seed)
-        
+
+
 def set_precision():
     torch.set_float32_matmul_precision("medium")
+
 
 def create_folder(args):
     if not os.path.exists(args.save_path + args.name):
@@ -61,6 +65,7 @@ def create_folder(args):
             os.mkdir(args.save_path + args.name)
         except:
             pass
+
 
 def get_devices(args):
     devices = list(range(int(args.devices)))
@@ -74,7 +79,7 @@ def main(args):
     callbacks = init_callbacks(args)
     wandb_logger = init_logger(args)
     devices = get_devices(args)
-    
+
     dataset = DataModule(
         args.model,
         task_names=args.list_tasks,
@@ -93,54 +98,49 @@ def main(args):
         tasks,
         label2id_dict,
     ) = dataset.prepare_data()
-    
 
     model = None
     if args.checkpoint:
         model = ModelModule.load_from_checkpoint(
             args.checkpoint,
-            model_name = args.model,
-            tasks = tasks,
-            batch_name_map_eval = batch_name_map_eval,
-            batch_name_map_test = batch_name_map_test,
-            label2id = label2id_dict,
+            model_name=args.model,
+            tasks=tasks,
+            batch_name_map_eval=batch_name_map_eval,
+            batch_name_map_test=batch_name_map_test,
+            label2id=label2id_dict,
             peft=args.peft,
-            peft_checkpoint = args.peft_checkpoint,
+            peft_checkpoint=args.peft_checkpoint,
             num_accum_batches=args.accum_batches,
-            r3f = args.r3f,
-            r4f = args.r4f,
-            scale_loss = args.scale_loss,
-            strict = False)
+            r3f=args.r3f,
+            r4f=args.r4f,
+            scale_loss=args.scale_loss,
+            strict=False,
+        )
     else:
         model = ModelModule(
-            model_name = args.model,
-            tasks = tasks,
-            batch_name_map_eval = batch_name_map_eval,
-            batch_name_map_test = batch_name_map_test,
-            label2id = label2id_dict,
-            peft_checkpoint = args.peft_checkpoint,
+            model_name=args.model,
+            tasks=tasks,
+            batch_name_map_eval=batch_name_map_eval,
+            batch_name_map_test=batch_name_map_test,
+            label2id=label2id_dict,
+            peft_checkpoint=args.peft_checkpoint,
             peft=args.peft,
             num_accum_batches=args.accum_batches,
-            r3f = args.r3f,
-            r4f = args.r4f,
-            scale_loss = args.scale_loss)
+            r3f=args.r3f,
+            r4f=args.r4f,
+            scale_loss=args.scale_loss,
+        )
 
     wandb_logger.watch(model)
 
     trainer = pl.Trainer(
         strategy="ddp_find_unused_parameters_true" if "xlm" in args.model else "ddp",
-        # strategy="ddp" if len(devices) > 1 else "auto",
         use_distributed_sampler=False,
-        # fast_dev_run=5,self.trainer.checkpoint_callback.dirpath
-        # limit_train_batches=2,
-        # num_sanity_val_steps=5,
-        # limit_val_batches=2,
         accelerator="auto",
         devices=devices,
         num_nodes=1,
         reload_dataloaders_every_n_epochs=1,
         val_check_interval=args.val_every_n_steps * args.accum_batches,
-        # val_check_interval=0.5,
         callbacks=callbacks,
         max_epochs=args.epochs,
         max_steps=args.steps,
@@ -153,7 +153,6 @@ def main(args):
             model,
             datamodule=dataset,
         )
-
 
     ckpt_dir = args.save_path + args.name
     ckpt_path = ckpt_dir + "/" + "best.ckpt"
@@ -168,7 +167,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, help="model")
     parser.add_argument("--name", type=str, help="exp_name")
-    parser.add_argument("--save_path", type=str, help="path", default="/home/semindan/baka/checkpoints_clean/")
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        help="path",
+        default="/home/semindan/baka/checkpoints_clean/",
+    )
     parser.add_argument("--wandb_project_name", type=str, help="path", default="thesis")
     parser.add_argument("--checkpoint", type=str, default=None)
     parser.add_argument("--devices", type=int, help="number of devices", default=1)
@@ -177,19 +181,31 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=int, help="number of steps", default=16000)
     parser.add_argument("--accum_batches", type=int, help="accum when t5", default=2)
     parser.add_argument("--batch_size", type=int, help="initial batch size", default=16)
-    parser.add_argument("--val_every_n_steps", type=int, help="frequency of eval", default=200)
+    parser.add_argument(
+        "--val_every_n_steps", type=int, help="frequency of eval", default=200
+    )
     parser.add_argument(
         "--eval_only", action=argparse.BooleanOptionalAction, default=False
     )
     parser.add_argument("--peft", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--peft_checkpoint", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--peft_checkpoint", action=argparse.BooleanOptionalAction, default=False
+    )
     parser.add_argument("--mix", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--prefix", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--heterogenous", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--prefix", action=argparse.BooleanOptionalAction, default=False
+    )
+    parser.add_argument(
+        "--heterogenous", action=argparse.BooleanOptionalAction, default=False
+    )
     parser.add_argument("--r3f", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--r4f", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--scale_loss", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--zero_shot_ctk", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--scale_loss", action=argparse.BooleanOptionalAction, default=False
+    )
+    parser.add_argument(
+        "--zero_shot_ctk", action=argparse.BooleanOptionalAction, default=False
+    )
     parser.add_argument(
         "-l",
         "--list_tasks",
@@ -200,5 +216,3 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     main(args)
-
-

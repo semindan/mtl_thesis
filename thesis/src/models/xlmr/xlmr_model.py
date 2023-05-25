@@ -4,6 +4,7 @@ import math
 from typing import List, Optional, Tuple, Union
 from transformers import XLMRobertaPreTrainedModel
 from transformers.modeling_outputs import SequenceClassifierOutput
+
 # from torch.nn.utils import spectral_norm
 from torch.nn.utils.parametrizations import spectral_norm
 
@@ -14,21 +15,27 @@ import numpy as np
 import transformers as tr
 from thesis.src.models.xlmr.xlmr_roberta import XLMRobertaModel
 
+
 def create_class_head(config, num_classes):
     return XLMRobertaClassificationHead(config, num_classes)
+
+
 class XLMRobertaMultiTask(XLMRobertaPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
     def __init__(self, config, tasks):
         super().__init__(config)
-        
-        config.retain_gradients = config.retain_gradients if ("retain_gradients" in config.__dict__) else False
+
+        config.retain_gradients = (
+            config.retain_gradients
+            if ("retain_gradients" in config.__dict__)
+            else False
+        )
         self.config = config
         # self.roberta = XLMRobertaModel()
         self.roberta = XLMRobertaModel(config, add_pooling_layer=True)
 
         self.retain_gradients = config.retain_gradients
-
 
         self.heads = nn.ParameterDict(
             {

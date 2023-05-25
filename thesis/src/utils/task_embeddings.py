@@ -1,4 +1,3 @@
-# %%
 import torch
 import numpy as np
 import argparse
@@ -32,7 +31,7 @@ def compute_Fisher_mt5(args, model, input_mask, total_tokens):
     for key in ["multihead_output", "layer_output"]:
         model_outputs = base_model._get_model_outputs(key=key)
         for i in range(base_model.config.num_hidden_layers):
-            name = "encoder.layer.{}.{}".format(i, key) 
+            name = "encoder.layer.{}.{}".format(i, key)
             model_outputs_i = (
                 model_outputs[i].grad
                 if args.feature_type == "grads"
@@ -40,7 +39,7 @@ def compute_Fisher_mt5(args, model, input_mask, total_tokens):
             )
             if model_outputs_i is not None:
                 score = torch.einsum(
-                    "ijk,ij->ijk", # this einsum replaces padded elements with zeroes
+                    "ijk,ij->ijk",  # this einsum replaces padded elements with zeroes
                     [
                         model_outputs_i,  # batch_size x max_seq_length x hidden_size
                         input_mask.float(),
@@ -54,10 +53,13 @@ def compute_Fisher_mt5(args, model, input_mask, total_tokens):
                     outputs[name] = score
 
             raise NotImplementedError
-    for key in ["decoder_multihead_output", "decoder_layer_output", "decoder_cross_attention_output"]:
+    for key in [
+        "decoder_multihead_output",
+        "decoder_layer_output",
+        "decoder_cross_attention_output",
+    ]:
         model_outputs = base_model._get_model_outputs(key=key)
         for i in range(base_model.config.num_hidden_layers):
-            
             name = "decoder.layer.{}.{}".format(i, key)
             model_outputs_i = (
                 model_outputs[i].grad
@@ -259,6 +261,7 @@ def compute_textemb(args, task_name, train_dataloader, model):
         # pickle.dump(vec_dict, f)
         joblib.dump(vec_dict, f)
 
+
 def compute_textemb_mt5(args, task_name, train_dataloader, model):
     device = torch.device("cuda")
     vec_dict = {}
@@ -299,21 +302,38 @@ def compute_textemb_mt5(args, task_name, train_dataloader, model):
         # pickle.dump(vec_dict, f)
         joblib.dump(vec_dict, f)
 
+
 # %%
 def main(args):
     set_seed(args)
     retain_grads = args.embed_type == "taskemb"
     task = args.list_tasks[0]
     dataset = DataModule(
-        args.model, task_names=args.list_tasks, batch_size=args.batch_size, to_text=args.model == "mt5", insert_prefix=True,
+        args.model,
+        task_names=args.list_tasks,
+        batch_size=args.batch_size,
+        to_text=args.model == "mt5",
+        insert_prefix=True,
     )
 
-    batch_name_map_eval, batch_name_map_test, tasks, label2id_dict = dataset.prepare_data()
-    dataset.setup("fit")    
+    (
+        batch_name_map_eval,
+        batch_name_map_test,
+        tasks,
+        label2id_dict,
+    ) = dataset.prepare_data()
+    dataset.setup("fit")
 
     model = None
     if args.checkpoint:
-        model = ModelModule.load_from_checkpoint(args.checkpoint, model_name=args.model, tasks=tasks, batch_name_map_eval=batch_name_map_eval, batch_name_map_test=batch_name_map_test, retain_grads=retain_grads)
+        model = ModelModule.load_from_checkpoint(
+            args.checkpoint,
+            model_name=args.model,
+            tasks=tasks,
+            batch_name_map_eval=batch_name_map_eval,
+            batch_name_map_test=batch_name_map_test,
+            retain_grads=retain_grads,
+        )
     else:
         model = ModelModule(
             args.model,
@@ -321,17 +341,20 @@ def main(args):
             batch_name_map_eval,
             batch_name_map_test,
             label2id=label2id_dict,
-            retain_grads=retain_grads
+            retain_grads=retain_grads,
         )
-
 
     print("loaded")
     if args.embed_type == "textemb":
         print("textemb start")
         if args.model == "mt5":
-            compute_textemb_mt5(args, task, dataset.train_dataloader(), model.child.model.encoder)
+            compute_textemb_mt5(
+                args, task, dataset.train_dataloader(), model.child.model.encoder
+            )
         else:
-            compute_textemb(args, task, dataset.train_dataloader(), model.child.model.roberta)
+            compute_textemb(
+                args, task, dataset.train_dataloader(), model.child.model.roberta
+            )
     elif args.embed_type == "taskemb":
         print("taskemb start")
         compute_taskemb(args, task, dataset.train_dataloader(), model.child)

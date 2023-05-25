@@ -1,8 +1,8 @@
-# %%
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS, TSNE
 import umap
 import numpy as np
+
 # import pickle
 import joblib
 from matplotlib import pyplot as plt
@@ -11,6 +11,8 @@ import copy
 import igraph as ig
 
 EMBEB_PATH = "/home/semindan/baka/thesis/src/embeddings/"
+
+
 def visual_compare_points(points1, points2, tasks):
     for i in range(len(points1)):
         x = points1[i][0]
@@ -27,6 +29,7 @@ def visual_compare_points(points1, points2, tasks):
     # plt.xlim((-0.1, 0.1))
     # plt.ylim((-0.1, 0.1))
     plt.show()
+
 
 def visualize_points(points, tasks):
     for i in range(len(points)):
@@ -45,8 +48,11 @@ def visualize_points(points, tasks):
         # fig.savefig("tmp.png", transparent=True)
     plt.show()
 
+
 def rrf(rankings):
-    return np.sum( 1 / (60 + rankings))
+    return np.sum(1 / (60 + rankings))
+
+
 def rank(src_tasks, src_embs, dst_task, dst_emb):
     # get cosine similarities of src_tasks to dst_task
     distances = cosine(src_tasks, src_embs, dst_emb)
@@ -54,10 +60,11 @@ def rank(src_tasks, src_embs, dst_task, dst_emb):
     argsorted = np.argsort(distances)
     ranks = np.arange(1, len(src_tasks) + 1)
     sorted_distances = distances[argsorted]
-    
+
     sorted_tasks = np.array(src_tasks)[argsorted]
 
     return list(zip(sorted_tasks, ranks, sorted_distances))
+
 
 def scores(components, src_tasks, src_dicts, dst_task, dst_dict):
     rankings = {}
@@ -73,24 +80,29 @@ def scores(components, src_tasks, src_dicts, dst_task, dst_dict):
     rrf_scores = {}
     for task in rankings:
         rrf_scores[task] = rrf(np.array(rankings[task]))
-    rrf_scores = dict(sorted(rrf_scores.items(), key=lambda entry: entry[1], reverse=True))
+    rrf_scores = dict(
+        sorted(rrf_scores.items(), key=lambda entry: entry[1], reverse=True)
+    )
     for i, src_task in enumerate(rrf_scores):
         rrf_scores[src_task] = (rrf_scores[src_task], i + 1)
     return rrf_scores
 
+
 def all_scores(components, tasks, vecs):
     scores_d = {}
     for i, task_dst in enumerate(tasks):
-        tasks_src = tasks[:i] + tasks[i + 1:]
-        vecs_src = vecs[:i] + vecs[i + 1:]
+        tasks_src = tasks[:i] + tasks[i + 1 :]
+        vecs_src = vecs[:i] + vecs[i + 1 :]
         scores_d[task_dst] = scores(components, tasks_src, vecs_src, task_dst, vecs[i])
     return scores_d
+
 
 def cosine(src_tasks, src_vecs, dst_vec):
     distances = []
     for i, src in enumerate(src_vecs):
         distances.append(spatial.distance.cosine(src, dst_vec))
     return np.array(distances)
+
 
 def cosine_rankings(tasks, vecs):
     distances = {}
@@ -118,11 +130,14 @@ def load(tasks, model, type):
             vecs.append(joblib.load(f))
     return vecs
 
+
 def load_task_embeds(tasks, model):
     return load(tasks, model, "_taskemb")
 
+
 def load_text_embeds(tasks, model):
     return load(tasks, model, "_textemb")
+
 
 def avg_vecs(components, task_dict):
     for key in task_dict.keys():
@@ -132,6 +147,7 @@ def avg_vecs(components, task_dict):
             entry = task_dict[key]
         task_dict[key] = entry
     return task_dict
+
 
 def get_long_vecs(components, task_dict):
     vec = []
@@ -145,6 +161,7 @@ def get_long_vecs(components, task_dict):
         num_layers += 1
     return vec / num_layers
 
+
 def fruchterman_reingold(scores_dict):
     forces = {}
     for task_src in scores_dict:
@@ -152,11 +169,15 @@ def fruchterman_reingold(scores_dict):
         for task_dst in scores_dict:
             if task_dst == task_src:
                 continue
-            force = (1/scores_dict[task_dst][task_src][1]) + (1/scores_dict[task_src][task_dst][1])
+            force = (1 / scores_dict[task_dst][task_src][1]) + (
+                1 / scores_dict[task_src][task_dst][1]
+            )
             # if task_dst in forces and task_src in forces[task_dst]:
             #     continue
             forces[task_src][task_dst] = force
     return forces
+
+
 def max_forces(forces):
     new_forces = {}
     for task_dst in forces:
@@ -164,7 +185,7 @@ def max_forces(forces):
         new_forces[task_src] = new_forces.get(task_src, {})
         new_forces[task_src][task_dst] = forces[task_dst][task_src]
         # new_forces.append((task_src, task_dst, forces[task_src][task_dst]))
-    
+
     return new_forces
 
 
@@ -185,6 +206,8 @@ def full_pipeline(components, tasks, task_vecs):
     new_forces = max_forces(forces)
 
     return scores_res, cosine_ranks, new_forces
+
+
 def prepare_results_for_graph(tasks, forces, res_scores):
     vs = []
     es = []
@@ -201,20 +224,19 @@ def prepare_results_for_graph(tasks, forces, res_scores):
     return vs, es, force, np.round(weights, 4)
 
 
-
 # %%
 tasks = ["xnli", "paws-x", "nc", "qadsm", "wpr", "qam", "ctk"]
 models = ["mt5", "xlm-r"]
-#%%
+# %%
 # tasks = ["paws-x", "qam", "nc"]
 text_vecs = load_text_embeds(tasks, "mt5")
 task_vecs = load_task_embeds(tasks, "mt5")
-#%%
+# %%
 task_text_vecs = copy.deepcopy(task_vecs)
 for i in range(len(tasks)):
     task_text_vecs[i]["text"] = text_vecs[i]["avg_feature_vec"]
 
-#%%
+# %%
 components = list(task_text_vecs[0].keys())
 # components = list(filter(lambda x: "lm_head" not in x and "decoder" not in x, components))
 components = list(filter(lambda x: "head" not in x, components))
@@ -225,18 +247,19 @@ res_scores, cosine_ranks, forces = full_pipeline(components, tasks, task_text_ve
 res_scores
 # %%
 vs, es, fs, weights = prepare_results_for_graph(tasks, forces, res_scores)
-res_dict = {"vs":vs, "es":es, "fs":fs, "weights": weights, "res_scores":res_scores}
+res_dict = {"vs": vs, "es": es, "fs": fs, "weights": weights, "res_scores": res_scores}
 joblib.dump(res_dict, "xlm-r_task_text.pkl")
 
-#%%
+# %%
 results = {}
 import os
+
 for filename in os.listdir():
     if filename.endswith(".pkl"):
         results[filename[:-4]] = joblib.load(filename)
 if not os.path.exists("pdf_embeds"):
     os.mkdir("pdf_embeds")
-#%%
+# %%
 layout = ig.Graph.layout_fruchterman_reingold
 for filename in results:
     vs = results[filename]["vs"]
@@ -244,26 +267,23 @@ for filename in results:
     fs = results[filename]["fs"]
     weights = results[filename]["weights"]
 
-
     g = ig.Graph(
         edges=es,
-        edge_attrs={'weight': weights, 'name':tasks},
+        edge_attrs={"weight": weights, "name": tasks},
         directed=True,
-
     )
     visual_style = {
         "edge_width": 2.0,
         "vertex_size": 45,
         "palette": "heat",
         "layout": layout(g),
-        "vertex_label" : tasks,
+        "vertex_label": tasks,
         "margin": 30,
         "bbox": (300, 300),
-        "vertex_color" : "steelblue" if "mt5" in filename else "limegreen",
-        "edge_background" : "transparent",
+        "vertex_color": "steelblue" if "mt5" in filename else "limegreen",
+        "edge_background": "transparent",
         "vertex_label_size": 12,
-        "edge_curved" : 0.7
-
+        "edge_curved": 0.7
         # "vertex_order" : tasks
         # "vertex_label_dist" : 1.2
         # "vertex_label_angle" : 90

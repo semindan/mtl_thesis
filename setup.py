@@ -1,8 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='thesis',
-    version='0.1.0',
-    packages=find_packages(include=['thesis.*']),
-    package_dir={"thesis" : "/home/semindan/baka/thesis"}
+    name="thesis",
+    version="0.1.0",
+    packages=find_packages(include=["thesis.*"]),
 )

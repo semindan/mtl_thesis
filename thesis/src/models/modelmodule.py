@@ -25,8 +25,6 @@ import os
 # self.__post_init__().
 
 
-
-
 class ModelModule(pl.LightningModule):
     def __init__(
         self,
@@ -99,8 +97,6 @@ class ModelModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self.child.training_step(batch, batch_idx)
-
-        # loss = self.scale_loss(loss, batch["task_name"], batch["task_size"])
 
         if loss is not None:
             self.log(
@@ -241,37 +237,3 @@ class ModelModule(pl.LightningModule):
 
         avg = sum([metric.compute() for metric in data_metrics]) / len(batch_name_map)
         self.log_value(name_split + "accumulate", avg, sync_dist=False)
-
-
-# %%
-# from mt5 import T5
-
-# path = "/home/semindan/baka/checkpoints/mt5_all_2/"
-# #%%
-# # #%%
-# model = ModelModule.load_from_checkpoint("/home/semindan/baka/checkpoints/mt5_all_2/best.ckpt", model_name = "mt5", label2id=[], strict=False)
-# # # %%
-# # model.model.save_pretrained(path + "chk")
-# # # %%
-# # model.model.from_pretrained(path + "chk")
-# # # %%
-# #%%
-# ckpt = torch.load(path + "best.ckpt", map_location=lambda storage, loc: storage)
-# new_state_dict = OrderedDict()
-
-# for k, v in ckpt["state_dict"].items():
-#     if k[:6] != 'child.model':
-#         name = "child." + k
-#     else:
-#         name = k
-#     new_state_dict[name] = v
-
-# model.load_state_dict(new_state_dict)
-
-# tokenized = model.tokenizer("xnli: premise: aaa hypothesis: aaa", return_tensors="pt")
-# model.tokenizer.batch_decode(model.child.model.generate(tokenized["input_ids"]))
-# # %%
-# # %%
-# # %%
-# model.save_checkpoint()
-# # %%

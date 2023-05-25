@@ -14,4 +14,20 @@ MODELS = {
 XGLUE_TASKS = ["paws-x", "nc", "xnli", "qadsm", "wpr", "qam"]
 AIC_TASKS = ["ctkfacts_nli", "csfever_nli"]
 AIC_PREFIX = "ctu-aic/"
-XNLI_LANGS = ['ar', 'bg', 'de', 'el', 'en', 'es', 'fr', 'hi', 'ru', 'sw', 'th', 'tr', 'ur', 'vi', 'zh'] 
+XNLI_LANGS = [
+    "ar",
+    "bg",
+    "de",
+    "el",
+    "en",
+    "es",
+    "fr",
+    "hi",
+    "ru",
+    "sw",
+    "th",
+    "tr",
+    "ur",
+    "vi",
+    "zh",
+]

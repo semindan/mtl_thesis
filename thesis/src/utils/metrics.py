@@ -5,6 +5,7 @@ import numpy as np
 import torchmetrics
 import torch.nn as nn
 
+
 def init_metrics(names):
     metrics = []
     for name in names:
@@ -16,6 +17,7 @@ def init_metrics(names):
             metrics.append(torchmetrics.Accuracy(task="multiclass", num_classes=10))
     metrics = nn.ModuleList(metrics)
     return metrics
+
 
 def simple_ndcg(preds, labels, guids):
     ndcgs = []
