@@ -94,6 +94,7 @@ class DataModule(pl.LightningDataModule):
         elif stage == "test" or stage == "predict":
             self.test = self.get_datasets_by_split(task_dict, "test")
 
+        
     def train_dataloader(self):
         train = self.train
         probs = self.probs
@@ -211,9 +212,6 @@ class DataModule(pl.LightningDataModule):
             yield self.mlm_chunk(mlm_iterators_data, languages, length_by_language)
 
     def mlm_chunk(self, mlm_iterators_data, languages, length_by_language):
-        lang_dict_data_grouped = self.prepare_mlm(
-            mlm_iterators_data, languages, length_by_language
-        )
         collator = DataCollatorForT5MLM(
             self.tokenizer,
             0.15,
@@ -223,6 +221,43 @@ class DataModule(pl.LightningDataModule):
             self.tokenizer.pad_token_id,
             self.tokenizer.pad_token_id,
         )
+        mlm_data = {}
+        for lang in languages:
+            for i, entry in enumerate((mlm_iterators_data[lang])):
+                if i >= max(0, length_by_language):
+                    break
+                if lang not in mlm_data:
+                    mlm_data[lang] = []
+
+                mlm_data[lang].append(entry)
+            mlm_data[lang] = datasets.Dataset.from_list(mlm_data[lang])
+
+        tokenized_dict_data = {
+            lang: mlm_data[lang].map(
+                self.tokenize_mix_function,
+                remove_columns=["text", "url", "timestamp"],
+                batched=True,
+                load_from_cache_file=True,
+            )
+            for lang in mlm_data
+        }
+
+
+        (self.inputs_len, self.targets_len) = collator.compute_input_and_target_lengths(
+            self.max_length_padding, 0.15, 3.0
+        )
+
+        lang_dict_data_grouped = {
+            lang: tokenized_dict_data[lang].map(
+                lambda x: collator.group_texts(self.inputs_len, x),
+                batched=True,
+                load_from_cache_file=True,
+            )
+            for lang in tokenized_dict_data
+        }
+
+        for k, v in lang_dict_data_grouped.items():
+            v.set_format("np")
 
         mix_interleaved = interleave_datasets(
             list(lang_dict_data_grouped.values()),
