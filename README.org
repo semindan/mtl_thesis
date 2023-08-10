@@ -9,3 +9,10 @@ This project uses code from the following sources:
 
 [[https://github.com/WeiChengTseng/Pytorch-PCGrad][implementation of PCGrad]]
 
+* TODO
+rewrite collator
+add tests
+rewrite argument passing in train.py
+
+
+

@@ -8,9 +8,9 @@ from datasets import dataset_dict
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler
 import re
-from itertools import chain
 from thesis.src.utils.collate import DataCollatorForT5MLM
-from dataclasses import dataclass, field
+from thesis.src.utils import collate
+from dataclasses import dataclass
 from transformers import AutoTokenizer
 from typing import Any
 import thesis.src.utils.utils as utils
@@ -48,56 +48,42 @@ class DataModule(pl.LightningDataModule):
         )
         self.rng = np.random.default_rng(seed=self.init_seed)
         self.rng_integers_range = 10000  # magic
-        (self.inputs_len, self.targets_len) = self.compute_input_and_target_lengths(
-            self.max_length_padding, 0.15, 3.0
-        )
 
     def prepare_data(self):
-        task_dict = self.load_data()
-        n_classes = []
-        label2id_dict = {}
-        self.tt = {}
-        for task_name, data in task_dict.items():
-            data_formatted = utils.format_columns(
-                data,
-                task_name,
-                to_text=self.to_text,
-                zero_shot_ctk=self.zero_shot_ctk,
-                insert_prefix=self.insert_prefix,
-            )
-            label_names = data_formatted["train"].features["label"].names
-            n_classes.append(len(label_names))
-            label2id_dict[task_name] = {
-                label: float(i) for i, label in enumerate(label_names)
-            }
-            self.tt[task_name] = data_formatted
+        task_dict = self.load_data(self.task_names)
+        n_classes, label2id_dict = self.get_label_info(task_dict)
 
-        for name, data in task_dict.items():
-            data = self.preprocess_task(name, data)
+        # for caching purposes
+        self.preprocess_tasks(task_dict)
 
+        # for logging
         batch_name_map_eval = self.get_task_mapping_split(task_dict, "validation")
         batch_name_map_test = self.get_task_mapping_split(task_dict, "test")
+
+        # for xlm-r classification heads initialization
+        #TODO can be deleted in favour of label2id_dict
         tasks = list(zip(list(task_dict), n_classes))
+
         return batch_name_map_eval, batch_name_map_test, tasks, label2id_dict
 
     def setup(self, stage: str):
-        task_dict = self.load_data()
-        for name in task_dict:
-            task_dict[name] = self.preprocess_task(name, task_dict[name])
-
+        task_dict = self.load_data(self.task_names)
+        task_dict = self.preprocess_tasks(task_dict)
+        
+        # for testing purposes
         if self.size:
             task_dict = self.cut_datasets(task_dict, self.size)
 
         if stage == "fit":
+            # I need to set these here because dataloader functions don't take any args
             self.train = self.get_datasets_by_split(task_dict, "train")
             self.probs = self.proportional_probs(self.train)
             if self.mix_mlm:
-                overall_length = np.sum(self.get_lengths(self.train))
-                languages = self.get_languages(task_dict)
+                #TODO disgusting, it's not even effective, why am I keeping it?
                 self.mlm = next(
                     self.mlm_dataset_iter(
-                        overall_length,
-                        languages,
+                        np.sum(self.get_lengths(self.train)),
+                        self.get_languages(task_dict),
                         chunks=self.trainer.max_epochs if self.trainer else 10,
                     )
                 )
@@ -147,6 +133,11 @@ class DataModule(pl.LightningDataModule):
         # Used to clean-up when the run is finished
         pass
 
+    def preprocess_tasks(self, task_dict):
+        for name, data in task_dict.items():
+            task_dict[name] = self.preprocess_task(name, data)
+        return task_dict
+    
     def preprocess_task(self, task_name, data):
         data = utils.format_columns(
             data,
@@ -184,6 +175,24 @@ class DataModule(pl.LightningDataModule):
                     continue
                 ret[name][task_split] = task[task_split]
         return ret
+    def get_label_info(self, task_dict):
+        label2id_dict = {}
+        n_classes = []
+        for task_name, data in task_dict.items():
+            data_formatted = utils.format_columns(
+                data,
+                task_name,
+                to_text=self.to_text,
+                zero_shot_ctk=self.zero_shot_ctk,
+                insert_prefix=self.insert_prefix,
+            )
+
+            label_names = data_formatted["train"].features["label"].names
+            n_classes.append(len(label_names))
+            label2id_dict[task_name] = {
+                label: float(i) for i, label in enumerate(label_names)
+            }
+        return n_classes, label2id_dict
 
     def get_task_mapping_split(self, task_dict, split):
         task_name_map = []
@@ -214,6 +223,7 @@ class DataModule(pl.LightningDataModule):
             self.tokenizer.pad_token_id,
             self.tokenizer.pad_token_id,
         )
+
         mix_interleaved = interleave_datasets(
             list(lang_dict_data_grouped.values()),
             probabilities=[1 / len(languages)] * len(languages),
@@ -236,23 +246,17 @@ class DataModule(pl.LightningDataModule):
         task_list = [split for task in task_dict.values() for split in task.values()]
         return np.array([len(split) for split in task_list])
 
-    def load_data(self):
-        tasks = {}
-        for i, name in enumerate(self.task_names):
-            data = self.load_task(name)
-            if name == "xnli_all":
-                tasks["xnli"] = data
-            else:
-                tasks[name] = data
+    def load_data(self, task_names):
+        tasks = {name : data for name, data in map(self.load_task, task_names)}
         return tasks
 
     def load_task(self, name):
         if name in XGLUE_TASKS:
-            return load_dataset("xglue", name)
+            return (name, load_dataset("xglue", name))
         elif name in AIC_TASKS:
-            return load_dataset(AIC_PREFIX + name)
+            return (name, load_dataset(AIC_PREFIX + name))
         elif name[-2:] in XNLI_LANGS and name[:-3] == "xnli":
-            return load_dataset("xnli", name[-2:])
+            return (name, load_dataset("xnli", name[-2:]))
         elif name == "xnli_all":
             lang_sets = [
                 load_dataset("xnli", lang, split="train").shuffle(seed=self.init_seed)
@@ -265,9 +269,9 @@ class DataModule(pl.LightningDataModule):
             val_test = load_dataset("xglue", "xnli")
             val_test.pop("train")
             val_test["train"] = new_data
-            return val_test
+            return ("xnli", val_test)
         else:
-            return load_dataset(name)
+            return (name, load_dataset(name))
 
     def cut_datasets(self, task_dict, size):
         for name in task_dict:
@@ -303,9 +307,15 @@ class DataModule(pl.LightningDataModule):
             )
             for lang in mlm_data
         }
+
+
+        (self.inputs_len, self.targets_len) = collate.compute_input_and_target_lengths(
+            self.max_length_padding, 0.15, 3.0
+        )
+
         lang_dict_data_grouped = {
             lang: tokenized_dict_data[lang].map(
-                lambda x: self.group_texts(self.inputs_len, x),
+                lambda x: collate.group_texts(self.inputs_len, x),
                 batched=True,
                 load_from_cache_file=True,
             )
@@ -319,25 +329,6 @@ class DataModule(pl.LightningDataModule):
     def tokenize_mix_function(self, examples):
         return self.tokenizer(examples["text"], return_attention_mask=False)
 
-    def group_texts(self, expanded_inputs_length, examples):
-        # Concatenate all texts.
-        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
-        if total_length >= expanded_inputs_length:
-            total_length = (
-                total_length // expanded_inputs_length
-            ) * expanded_inputs_length
-        # Split by chunks of max_len.
-        result = {
-            k: [
-                t[i : i + expanded_inputs_length]
-                for i in range(0, total_length, expanded_inputs_length)
-            ]
-            for k, t in concatenated_examples.items()
-        }
-        return result
 
     def get_named_dataloaders(self, loader_dict, task_name):
         named_loaders = {}
@@ -383,62 +374,10 @@ class DataModule(pl.LightningDataModule):
         normalized_temp = temp_probs / np.sum(temp_probs)
         return normalized_temp
 
-    def compute_input_and_target_lengths(
-        self, inputs_length, noise_density, mean_noise_span_length
-    ):
-        """This function is copy of `random_spans_helper <https://github.com/google-research/text-to-text-transfer-transformer/blob/84f8bcc14b5f2c03de51bd3587609ba8f6bbd1cd/t5/data/preprocessors.py#L2466>`__ .
-        Training parameters to avoid padding with random_spans_noise_mask.
-        When training a model with random_spans_noise_mask, we would like to set the other
-        training hyperparmeters in a way that avoids padding.
-        This function helps us compute these hyperparameters.
-        We assume that each noise span in the input is replaced by extra_tokens_per_span_inputs sentinel tokens,
-        and each non-noise span in the targets is replaced by extra_tokens_per_span_targets sentinel tokens.
-        This function tells us the required number of tokens in the raw example (for split_tokens())
-        as well as the length of the encoded targets. Note that this function assumes
-        the inputs and targets will have EOS appended and includes that in the reported length.
-        Args:
-            inputs_length: an integer - desired length of the tokenized inputs sequence
-            noise_density: a float
-            mean_noise_span_length: a float
-        Returns:
-            tokens_length: length of original text in tokens
-            targets_length: an integer - length in tokens of encoded targets sequence
-        """
-
-        def _tokens_length_to_inputs_length_targets_length(tokens_length):
-            num_noise_tokens = int(round(tokens_length * noise_density))
-            num_nonnoise_tokens = tokens_length - num_noise_tokens
-            num_noise_spans = int(round(num_noise_tokens / mean_noise_span_length))
-            # inputs contain all nonnoise tokens, sentinels for all noise spans
-            # and one EOS token.
-            _input_length = num_nonnoise_tokens + num_noise_spans + 1
-            _output_length = num_noise_tokens + num_noise_spans + 1
-            return _input_length, _output_length
-
-        tokens_length = inputs_length
-
-        while (
-            _tokens_length_to_inputs_length_targets_length(tokens_length + 1)[0]
-            <= inputs_length
-        ):
-            tokens_length += 1
-
-        inputs_length, targets_length = _tokens_length_to_inputs_length_targets_length(
-            tokens_length
-        )
-
-        # minor hack to get the targets length to be equal to inputs length
-        # which is more likely to have been set to a nice round number.
-        if noise_density == 0.5 and targets_length > inputs_length:
-            tokens_length -= 1
-            targets_length -= 1
-        return tokens_length, targets_length
-
 
 class StrIgnoreDevice(str):
     def to(self, device):
         return self
-
 
 class DataLoaderWithTaskname:
     def __init__(self, task_name, split_name, data_loader):

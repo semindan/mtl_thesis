@@ -2,6 +2,7 @@ import torchmetrics
 import torch.nn as nn
 from datasets import Features
 from thesis.src.utils.metrics import get_guids
+from datasets.dataset_dict import DatasetDict
 import os
 import copy
 
@@ -15,11 +16,14 @@ def format_columns(
         case "xnli":
             data = format_xnli(data)
         case "wpr":
-            data = copy.deepcopy(data)
-            for part in data:
-                data[part] = data[part].add_column(
-                    name="guids", column=get_guids(data[part], "query")
-                )
+            #TODO why was it necessary to deepcopy???
+            # I surely remember something went wrong, yet I don't remember what exactly
+            # data = copy.deepcopy(data)
+            data = DatasetDict({k: v.add_column(name="guids", column=get_guids(v, "query")) for k, v in data.items()})
+            # for part in data:
+            #     data[part] = data[part].add_column(
+            #         name="guids", column=get_guids(data[part], "query")
+            #     )
             data = format_wpr(data, to_text=to_text)
         case "paws-x":
             data = format_paws_x(data)

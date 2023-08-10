@@ -137,7 +137,7 @@ def main(args):
         strategy="ddp_find_unused_parameters_true" if "xlm" in args.model else "ddp",
         use_distributed_sampler=False,
         accelerator="auto",
-        devices=devices,
+        devices="auto",
         num_nodes=1,
         reload_dataloaders_every_n_epochs=1,
         val_check_interval=args.val_every_n_steps * args.accum_batches,
