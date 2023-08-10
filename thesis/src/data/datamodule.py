@@ -1,4 +1,4 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 from datasets import load_dataset, interleave_datasets
 from torch.utils.data import DataLoader

@@ -1,4 +1,4 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from thesis.src.models.xlmr.xlmr_model import XLMRobertaMultiTask
 import torch
 from transformers import get_constant_schedule_with_warmup

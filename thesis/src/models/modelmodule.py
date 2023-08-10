@@ -1,6 +1,6 @@
 # %%
 from typing import Any, Dict
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 from peft import get_peft_config, get_peft_model, LoraConfig, TaskType, PeftModel
 from dataclasses import dataclass

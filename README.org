@@ -11,8 +11,9 @@ This project uses code from the following sources:
 
 * TODO
 rewrite collator
-add tests
-rewrite argument passing in train.py
 
+add tests
+
+rewrite argument passing in train.py (using LightningCLI)
 
 

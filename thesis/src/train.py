@@ -1,12 +1,12 @@
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning import loggers as pl_loggers
+import lightning.pytorch as pl
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch import loggers as pl_loggers
 import torch.nn as nn
 import torch.nn.functional as F
 import transformers as tr
 import torch
 import numpy as np
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 import pickle
 from thesis.src.data.datamodule import DataModule
 import argparse

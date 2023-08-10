@@ -1,5 +1,5 @@
 from typing import Any
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from transformers import AutoTokenizer
 from thesis.src.models.mt5.mt5_model import MT5ForConditionalGeneration
 import torch
