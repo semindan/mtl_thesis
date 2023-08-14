@@ -46,9 +46,6 @@ class ModelModule(pl.LightningModule):
 
         if model_name == "mt5_pcgrad":
             self.automatic_optimization = False
-        # self.automatic_optimization = False
-        # self.all_losses = []
-        # self.label2id = config.label2id
         path = MODELS[model_name]["model_name"]
         child_module = MODELS[model_name]["module"]
 
