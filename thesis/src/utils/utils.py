@@ -62,7 +62,8 @@ def format_columns(
         # data = data.rename_column("label", "label_id")
         data = data.remove_columns(column_names=column_names)
 
-    data.set_format("pt")
+    # data.set_format("pt")
+    data = data.with_format("pt")
     return data
 
 
