@@ -14,11 +14,6 @@ rewrite collator
 
 add tests
 
-rewrite argument passing in train.py (using LightningCLI)
 
-
-how to manage name-passing to model without instantiation of data module?
-in other words, how can I use the task names and label info without messing with the data module?
-moreover, how it should work with CLI?
 
 

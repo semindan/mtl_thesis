@@ -64,7 +64,13 @@ class DataModule(pl.LightningDataModule):
         #TODO can be deleted in favour of label2id_dict
         tasks = list(zip(list(task_dict), n_classes))
 
-        return batch_name_map_eval, batch_name_map_test, tasks, label2id_dict
+        ret_dict = {
+            "batch_name_map_eval": batch_name_map_eval,
+            "batch_name_map_test": batch_name_map_test,
+            "tasks": tasks,
+            "label2id": label2id_dict,
+        }
+        return ret_dict
 
     def setup(self, stage: str):
         task_dict = self.load_data(self.task_names)

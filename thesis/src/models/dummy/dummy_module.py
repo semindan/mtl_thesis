@@ -8,15 +8,16 @@ from torch_optimizer import Adafactor
 import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW
+from thesis.src.models.dummy.dummy_model import DummyModel
 
 
-class MT5(pl.LightningModule):
-    def __init__(self, config, path="google/mt5-small"):
+class DummyModule(pl.LightningModule):
+    def __init__(self, config, path="xlm-roberta-base"):
         super().__init__()
         self.save_hyperparameters()
         self.label2id = config.label2id
         self.tokenizer = AutoTokenizer.from_pretrained(path)
-        self.model = MT5ForConditionalGeneration.from_pretrained(path, config=config)
+        self.model = DummyModel(config.hidden_size, config.num_labels, vocab_size=config.vocab_size)
         self.do_r3f = config.r3f
         self.do_scale = config.scale_loss
         eps = 1e-5
@@ -117,43 +118,30 @@ class MT5(pl.LightningModule):
         factor = torch.tensor(n_classes).log()
         return loss / factor
 
-    def generate_predictions(self, input_ids, task_name):
-        predictions = self.model.generate(input_ids=input_ids)
-        predictions = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
-        predictions = torch.tensor(
-            [
-                -1.0
-                if word not in self.label2id[task_name]
-                else self.label2id[task_name][word]
-                for word in predictions
-            ]
-        )
-        return predictions
-
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        predictions = self.generate_predictions(batch["input_ids"], batch["task_name"])
-        references = batch["label"]
+        out = self(**batch)
+        predictions = torch.argmax(out.logits, dim=-1)
+        references = batch["labels"]
         return predictions, references
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        predictions = self.generate_predictions(batch["input_ids"], batch["task_name"])
-        references = batch["label"]
+        out = self(**batch)
+        predictions = torch.argmax(out.logits, dim=-1)
+        references = batch["labels"]
         return predictions, references
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        predictions = self.generate_predictions(batch["input_ids"], batch["task_name"])
-        references = batch["label"]
+        out = self(**batch)
+        predictions = torch.argmax(out.logits, dim=-1)
+        references = batch["labels"]
         return predictions, references
 
     def configure_optimizers(self):
-        print("⚡", "using T5", "⚡")
+        print("⚡", "using dummy", "⚡")
 
         lr = 1e-3
-        optimizer = Adafactor(
+        optimizer = AdamW(
             self.parameters(),
-            lr=lr,
-            relative_step=False,
-            warmup_init=False,
-            scale_parameter=True,
+            lr=lr
         )
         return optimizer
