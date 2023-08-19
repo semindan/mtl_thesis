@@ -23,15 +23,18 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
+  logger:
+      class_path: lightning.pytorch.loggers.WandbLogger
+      init_args:
+        name: testtest
+        project: mtl_thesis_test
 
-        
   accelerator: auto
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: 32-true
-  logger: null
-  fast_dev_run: false
+  precision: bf16-mixed
+  fast_dev_run: true
   max_epochs: null
   min_epochs: null
   max_steps: -1
@@ -46,9 +49,9 @@ trainer:
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
   log_every_n_steps: null
-  enable_checkpointing: null
-  enable_progress_bar: null
-  enable_model_summary: null
+  enable_checkpointing: true
+  enable_progress_bar: true
+  enable_model_summary: true
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
@@ -64,7 +67,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
-  model_name: mt5
+  model_name: xlm-r
   tasks: null
   batch_name_map_eval: null
   batch_name_map_test: null
@@ -77,9 +80,9 @@ model:
   scale_loss: false
   retain_grads: false
 data:
-  model_name: mt5
+  model_name: xlm-r
   size: null
-  to_text: true
+  to_text: false
   task_names: [paws-x, nc]
   t: 1
   batch_size: 32
@@ -91,4 +94,4 @@ data:
   insert_prefix: true
   init_seed: 42
   mlm_prob: 0.01
-# ckpt_path: "checkpoints/mt5/"
+ckpt_path: "checkpoints/xlm-r/"

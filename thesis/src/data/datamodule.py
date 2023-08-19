@@ -15,6 +15,8 @@ from transformers import AutoTokenizer
 from typing import Any
 import thesis.src.utils.utils as utils
 import datasets
+from thesis.src.data.mtl_dataloaders import DataLoaderWithTaskname, MultitaskDataloader
+
 from thesis.src.utils.constants import (
     MODELS,
     XGLUE_TASKS,
@@ -52,6 +54,11 @@ class DataModule(pl.LightningDataModule):
     def prepare_data(self):
         task_dict = self.load_data(self.task_names)
         n_classes, label2id_dict = self.get_label_info(task_dict)
+
+        # TODO multilingual datasets have a lot of different eval splits,
+        # maybe I could load only a portion of the train split instead of loading the whole thing
+        # and then cutting it
+        task_dict = self.cut_datasets(task_dict, 1)
 
         # for caching purposes
         self.preprocess_tasks(task_dict)
@@ -316,7 +323,8 @@ class DataModule(pl.LightningDataModule):
 
     def cut_datasets(self, task_dict, size):
         for name in task_dict:
-            task_dict[name]["train"] = task_dict[name]["train"].select(np.arange(size))
+            for split in task_dict[name]:
+                task_dict[name][split] = task_dict[name][split].select(np.arange(size))
         return task_dict
 
     def get_languages(self, task_dict):
@@ -401,73 +409,17 @@ class DataModule(pl.LightningDataModule):
             sampler=sampler,
         )
 
-    def tokenize_map(self, tokenizer, column_names, example):
-        return tokenizer(
-            *[example[column_name] for column_name in column_names],
-            padding="max_length",
-            max_length=512,
-            truncation=True,
-            return_tensors="pt",
-        )
+    # def tokenize_map(self, tokenizer, column_names, example):
+    #     return tokenizer(
+    #         *[example[column_name] for column_name in column_names],
+    #         padding="max_length",
+    #         max_length=512,
+    #         truncation=True,
+    #         return_tensors="pt",
+    #     )
 
     def temperature(self, probs, t):
         temp_probs = probs ** (1 / t)
         normalized_temp = temp_probs / np.sum(temp_probs)
         return normalized_temp
 
-
-class StrIgnoreDevice(str):
-    def to(self, device):
-        return self
-
-class DataLoaderWithTaskname:
-    def __init__(self, task_name, split_name, data_loader):
-        self.task_name = task_name
-        self.split_name = split_name
-        self.data_loader = data_loader
-
-        self.batch_size = data_loader.batch_size
-        self.dataset = data_loader.dataset
-
-    def __len__(self):
-        return len(self.data_loader)
-
-    def __iter__(self):
-        for batch in self.data_loader:
-            batch["task_name"] = StrIgnoreDevice(self.task_name)
-            batch["split_name"] = StrIgnoreDevice(self.split_name)
-            batch["task_size"] = StrIgnoreDevice(len(self.dataset))
-            yield batch
-
-
-class MultitaskDataloader:
-    def __init__(self, dataloader_list, probs, seed=42):
-        self.dataloader_list = dataloader_list
-        self.num_batches_list = [len(dataloader) for dataloader in self.dataloader_list]
-        self.dataset = [None] * sum(
-            len(dataloader.dataset) for dataloader in self.dataloader_list
-        )
-        self.probs = probs
-        self.seed = seed
-
-    def __len__(self):
-        return sum(self.num_batches_list)
-
-    def __iter__(self):
-        task_choice_list = []
-        probs_list = []
-        for i, _ in enumerate(self.dataloader_list):
-            task_choice_list += [i] * self.num_batches_list[i]
-            probs_list += [
-                self.probs[i] / self.num_batches_list[i]
-            ] * self.num_batches_list[i]
-
-        rng = np.random.default_rng(seed=self.seed)
-        task_choice_list = rng.choice(
-            task_choice_list, len(task_choice_list), p=probs_list, replace=False
-        )
-        dataloader_iter_list = [iter(dataloader) for dataloader in self.dataloader_list]
-
-        for task_choice in task_choice_list:
-            next_batch = next(dataloader_iter_list[task_choice])
-            yield next_batch

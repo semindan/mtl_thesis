@@ -6,11 +6,14 @@ from thesis.src.data.datamodule import DataModule
 
 class MtlLightningCLI(LightningCLI):
     def before_instantiate_classes(self) -> None:
-        if self.subcommand:
-            config = self.config[self.subcommand]
+        config = self.config[self.subcommand] if self.subcommand else self.config
         data = self.datamodule_class(**config["data"].as_dict())
+                
         for arg, val in data.prepare_data().items():
+            
             config["model"][arg] = val
+
+        print(config["model"])
         
 def main():
     cli = MtlLightningCLI(model_class = ModelModule,

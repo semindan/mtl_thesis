@@ -1,7 +1,7 @@
 import torch.nn as nn
-
+#%%
 class DummyModel(nn.Module):
-    def __init__(self, hidden_size=768, num_labels=2, vocab_size=100):
+    def __init__(self, hidden_size=768, num_labels=10, vocab_size=250000):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, 16)
         self.linear = nn.Linear(hidden_size, num_labels)
