@@ -1,4 +1,5 @@
 # lightning.pytorch==2.0.6
+model: &model mt5
 seed_everything: true
 trainer:
   callbacks:
@@ -26,15 +27,16 @@ trainer:
   logger:
       class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
-        name: testtest
-        project: mtl_thesis_test
+        name: run_name
+        save_dir: wandb_dir/run_name
+        project: wandb_project_name
 
   accelerator: auto
   strategy: auto
   devices: auto
   num_nodes: 1
   precision: bf16-mixed
-  fast_dev_run: true
+  fast_dev_run: false
   max_epochs: null
   min_epochs: null
   max_steps: -1
@@ -67,7 +69,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
-  model_name: xlm-r
+  model_name: *model
   tasks: null
   batch_name_map_eval: null
   batch_name_map_test: null
@@ -80,9 +82,9 @@ model:
   scale_loss: false
   retain_grads: false
 data:
-  model_name: xlm-r
+  model_name: *model
   size: null
-  to_text: false
+  to_text: true
   task_names: [paws-x, nc]
   t: 1
   batch_size: 32
@@ -94,4 +96,4 @@ data:
   insert_prefix: true
   init_seed: 42
   mlm_prob: 0.01
-ckpt_path: "checkpoints/xlm-r/"
+# ckpt_path: "checkpoints/xlm-r-2/"

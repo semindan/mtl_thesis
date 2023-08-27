@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from transformers import AutoTokenizer
 from typing import Any
 import thesis.src.utils.utils as utils
-import datasets
 from thesis.src.data.mtl_dataloaders import DataLoaderWithTaskname, MultitaskDataloader
 
 from thesis.src.utils.constants import (
@@ -50,6 +49,7 @@ class DataModule(pl.LightningDataModule):
         )
         self.rng = np.random.default_rng(seed=self.init_seed)
         self.rng_integers_range = 10000  # magic
+        self.to_text = self.model_name == "mt5"
 
     def prepare_data(self):
         task_dict = self.load_data(self.task_names)
