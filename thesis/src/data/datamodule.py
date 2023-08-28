@@ -9,6 +9,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import RandomSampler
 import re
 from thesis.src.utils.collate import DataCollatorForT5MLM
+import thesis.src.utils.collate as collate
 from thesis.src.utils import collate
 from dataclasses import dataclass
 from transformers import AutoTokenizer
@@ -85,8 +86,10 @@ class DataModule(pl.LightningDataModule):
         
         # for testing purposes
         if self.size:
+            raise NotImplementedError
             task_dict = self.cut_datasets(task_dict, self.size)
 
+        print(task_dict.values())
         if stage == "fit":
             # I need to set these here because dataloader functions don't take any args
             self.train = self.get_datasets_by_split(task_dict, "train")
@@ -225,12 +228,15 @@ class DataModule(pl.LightningDataModule):
             yield self.mlm_chunk(mlm_iterators_data, languages, length_by_language)
 
     def mlm_chunk(self, mlm_iterators_data, languages, length_by_language):
+        inputs_len, targets_len = collate.compute_input_and_target_lengths(
+            self.max_length_padding, 0.15, 3.0
+        )
         collator = DataCollatorForT5MLM(
             self.tokenizer,
             0.15,
             3.0,
             self.max_length_padding,
-            self.targets_len,
+            targets_len,
             self.tokenizer.pad_token_id,
             self.tokenizer.pad_token_id,
         )
@@ -256,13 +262,10 @@ class DataModule(pl.LightningDataModule):
         }
 
 
-        (self.inputs_len, self.targets_len) = collator.compute_input_and_target_lengths(
-            self.max_length_padding, 0.15, 3.0
-        )
 
         lang_dict_data_grouped = {
             lang: tokenized_dict_data[lang].map(
-                lambda x: collator.group_texts(self.inputs_len, x),
+                lambda x: collate.group_texts(inputs_len, x),
                 batched=True,
                 load_from_cache_file=True,
             )
@@ -335,45 +338,42 @@ class DataModule(pl.LightningDataModule):
         languages = np.unique(languages)
         return languages
 
-    def prepare_mlm(self, mlm_iterators_data, languages, mlm_len_per_lang, chunks=1):
-        mlm_data = {}
-        for lang in languages:
-            for i, entry in enumerate((mlm_iterators_data[lang])):
-                if i >= max(0, mlm_len_per_lang):
-                    break
-                if lang not in mlm_data:
-                    mlm_data[lang] = []
+    # def prepare_mlm(self, mlm_iterators_data, languages, mlm_len_per_lang, chunks=1):
+    #     mlm_data = {}
+    #     for lang in languages:
+    #         for i, entry in enumerate((mlm_iterators_data[lang])):
+    #             if i >= max(0, mlm_len_per_lang):
+    #                 break
+    #             if lang not in mlm_data:
+    #                 mlm_data[lang] = []
 
-                mlm_data[lang].append(entry)
-            mlm_data[lang] = datasets.Dataset.from_list(mlm_data[lang])
+    #             mlm_data[lang].append(entry)
+    #         mlm_data[lang] = datasets.Dataset.from_list(mlm_data[lang])
 
-        tokenized_dict_data = {
-            lang: mlm_data[lang].map(
-                self.tokenize_mix_function,
-                remove_columns=["text", "url", "timestamp"],
-                batched=True,
-                load_from_cache_file=True,
-            )
-            for lang in mlm_data
-        }
+    #     tokenized_dict_data = {
+    #         lang: mlm_data[lang].map(
+    #             self.tokenize_mix_function,
+    #             remove_columns=["text", "url", "timestamp"],
+    #             batched=True,
+    #             load_from_cache_file=True,
+    #         )
+    #         for lang in mlm_data
+    #     }
 
 
-        (self.inputs_len, self.targets_len) = collate.compute_input_and_target_lengths(
-            self.max_length_padding, 0.15, 3.0
-        )
 
-        lang_dict_data_grouped = {
-            lang: tokenized_dict_data[lang].map(
-                lambda x: collate.group_texts(self.inputs_len, x),
-                batched=True,
-                load_from_cache_file=True,
-            )
-            for lang in tokenized_dict_data
-        }
+    #     lang_dict_data_grouped = {
+    #         lang: tokenized_dict_data[lang].map(
+    #             lambda x: collate.group_texts(inputs_len, x),
+    #             batched=True,
+    #             load_from_cache_file=True,
+    #         )
+    #         for lang in tokenized_dict_data
+    #     }
 
-        for k, v in lang_dict_data_grouped.items():
-            v.set_format("np")
-        return lang_dict_data_grouped
+    #     for k, v in lang_dict_data_grouped.items():
+    #         v.set_format("np")
+    #     return lang_dict_data_grouped
 
     def tokenize_mix_function(self, examples):
         return self.tokenizer(examples["text"], return_attention_mask=False)
@@ -408,15 +408,6 @@ class DataModule(pl.LightningDataModule):
             drop_last=drop_last,
             sampler=sampler,
         )
-
-    # def tokenize_map(self, tokenizer, column_names, example):
-    #     return tokenizer(
-    #         *[example[column_name] for column_name in column_names],
-    #         padding="max_length",
-    #         max_length=512,
-    #         truncation=True,
-    #         return_tensors="pt",
-    #     )
 
     def temperature(self, probs, t):
         temp_probs = probs ** (1 / t)

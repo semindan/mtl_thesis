@@ -90,7 +90,7 @@ data:
   batch_size: 32
   distributed: false
   max_length_padding: 512
-  mix_mlm: false
+  mix_mlm: true
   zero_shot_ctk: false
   heterogenous_distributed: true
   insert_prefix: true
