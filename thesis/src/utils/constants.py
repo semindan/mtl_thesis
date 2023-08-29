@@ -6,7 +6,7 @@ from thesis.src.models.mbert.mbert_module import MBERTModule
 
 MODELS = {
     "xlm-r": {"model_name": "xlm-roberta-base", "module": XLMRModule},
-    "mt5": {"model_name": "google/mt5-small", "module": MT5},
+    "mt5": {"model_name": "google/mt5-base", "module": MT5},
     "mt5_pcgrad": {"model_name": "google/mt5-base", "module": MT5PCGrad},
     "mbert": {"model_name": "bert-base-multilingual-cased", "module": MBERTModule},
 }

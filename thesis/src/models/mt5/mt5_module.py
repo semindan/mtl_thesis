@@ -1,7 +1,8 @@
 from typing import Any
 import lightning.pytorch as pl
 from transformers import AutoTokenizer
-from thesis.src.models.mt5.mt5_model import MT5ForConditionalGeneration
+# from thesis.src.models.mt5.mt5_model import MT5ForConditionalGeneration
+from transformers import MT5ForConditionalGeneration
 import torch
 from thesis.src.optim.pcgrad import PCGrad
 from torch_optimizer import Adafactor
@@ -11,7 +12,7 @@ from torch.optim import AdamW
 
 
 class MT5(pl.LightningModule):
-    def __init__(self, config, path="google/mt5-small"):
+    def __init__(self, config, path="google/mt5-base"):
         super().__init__()
         self.save_hyperparameters()
         self.label2id = config.label2id
@@ -148,7 +149,7 @@ class MT5(pl.LightningModule):
     def configure_optimizers(self):
         print("⚡", "using T5", "⚡")
 
-        lr = 1e-3
+        lr = 1e-4
         optimizer = Adafactor(
             self.parameters(),
             lr=lr,

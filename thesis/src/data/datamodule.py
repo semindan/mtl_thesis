@@ -1,3 +1,4 @@
+#%%
 import lightning.pytorch as pl
 import torch
 from datasets import load_dataset, interleave_datasets
@@ -86,23 +87,21 @@ class DataModule(pl.LightningDataModule):
         
         # for testing purposes
         if self.size:
-            raise NotImplementedError
             task_dict = self.cut_datasets(task_dict, self.size)
 
-        print(task_dict.values())
         if stage == "fit":
             # I need to set these here because dataloader functions don't take any args
             self.train = self.get_datasets_by_split(task_dict, "train")
             self.probs = self.proportional_probs(self.train)
-            if self.mix_mlm:
-                #TODO disgusting, it's not even effective, why am I keeping it?
-                self.mlm = next(
-                    self.mlm_dataset_iter(
-                        np.sum(self.get_lengths(self.train)),
-                        self.get_languages(task_dict),
-                        chunks=self.trainer.max_epochs if self.trainer else 10,
-                    )
-                )
+            # if self.mix_mlm:
+            #     #TODO disgusting, it's not even effective, why am I keeping it?
+            #     self.mlm = next(
+            #         self.mlm_dataset_iter(
+            #             np.sum(self.get_lengths(self.train)),
+            #             self.get_languages(task_dict),
+            #             chunks=self.trainer.max_epochs if self.trainer else 10,
+            #         )
+            #     )
             self.eval = self.get_datasets_by_split(task_dict, "validation")
 
         elif stage == "validate":
@@ -129,11 +128,10 @@ class DataModule(pl.LightningDataModule):
 
         probs = self.temperature(probs, t=self.t)
 
-        if self.mix_mlm:
-            mlm_data = self.mlm
-            probs = np.append(probs * (1 - self.mlm_prob), self.mlm_prob)
-            train["mc4"] = mlm_data
-
+        # if self.mix_mlm:
+        #     mlm_data = self.mlm
+        #     probs = np.append(probs * (1 - self.mlm_prob), self.mlm_prob)
+        #     train["mc4"] = mlm_data
         loaders = self.loaders_by_split(train, shuffle=True, seed=seed_epoch)
         return MultitaskDataloader(loaders, probs=probs, seed=seed)
 
@@ -256,7 +254,7 @@ class DataModule(pl.LightningDataModule):
                 self.tokenize_mix_function,
                 remove_columns=["text", "url", "timestamp"],
                 batched=True,
-                load_from_cache_file=True,
+                # load_from_cache_file=True,
             )
             for lang in mlm_data
         }
@@ -337,43 +335,6 @@ class DataModule(pl.LightningDataModule):
                 languages.append(re.findall("(?:validation.)(.{2})", split)[0])
         languages = np.unique(languages)
         return languages
-
-    # def prepare_mlm(self, mlm_iterators_data, languages, mlm_len_per_lang, chunks=1):
-    #     mlm_data = {}
-    #     for lang in languages:
-    #         for i, entry in enumerate((mlm_iterators_data[lang])):
-    #             if i >= max(0, mlm_len_per_lang):
-    #                 break
-    #             if lang not in mlm_data:
-    #                 mlm_data[lang] = []
-
-    #             mlm_data[lang].append(entry)
-    #         mlm_data[lang] = datasets.Dataset.from_list(mlm_data[lang])
-
-    #     tokenized_dict_data = {
-    #         lang: mlm_data[lang].map(
-    #             self.tokenize_mix_function,
-    #             remove_columns=["text", "url", "timestamp"],
-    #             batched=True,
-    #             load_from_cache_file=True,
-    #         )
-    #         for lang in mlm_data
-    #     }
-
-
-
-    #     lang_dict_data_grouped = {
-    #         lang: tokenized_dict_data[lang].map(
-    #             lambda x: collate.group_texts(inputs_len, x),
-    #             batched=True,
-    #             load_from_cache_file=True,
-    #         )
-    #         for lang in tokenized_dict_data
-    #     }
-
-    #     for k, v in lang_dict_data_grouped.items():
-    #         v.set_format("np")
-    #     return lang_dict_data_grouped
 
     def tokenize_mix_function(self, examples):
         return self.tokenizer(examples["text"], return_attention_mask=False)
