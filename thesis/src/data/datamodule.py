@@ -57,9 +57,6 @@ class DataModule(pl.LightningDataModule):
         task_dict = self.load_data(self.task_names)
         n_classes, label2id_dict = self.get_label_info(task_dict)
 
-        # TODO multilingual datasets have a lot of different eval splits,
-        # maybe I could load only a portion of the train split instead of loading the whole thing
-        # and then cutting it
         task_dict = self.cut_datasets(task_dict, 1)
 
         # for caching purposes
@@ -70,7 +67,6 @@ class DataModule(pl.LightningDataModule):
         batch_name_map_test = self.get_task_mapping_split(task_dict, "test")
 
         # for xlm-r classification heads initialization
-        #TODO can be deleted in favour of label2id_dict
         tasks = list(zip(list(task_dict), n_classes))
 
         ret_dict = {
